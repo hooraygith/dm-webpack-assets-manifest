@@ -248,7 +248,8 @@ WebpackAssetsManifest.prototype.toJSON = function()
  */
 WebpackAssetsManifest.prototype.toString = function()
 {
-  return JSON.stringify(this, this.options.replacer, this.options.space) || '{}';
+  const list = Object.keys(this.assets).map(key => this.assets[key]);
+  return JSON.stringify(list, this.options.replacer, this.options.space) || '{}';
 };
 
 /**
@@ -306,12 +307,14 @@ WebpackAssetsManifest.prototype.handleAfterEmit = function(compilation, callback
 
   var output = this.getOutputPath();
 
+  const outputString = '{"files": ' + this.toString() + '}';
+
   require('mkdirp')(
     path.dirname(output),
     function(/* err */) {
       fs.writeFile(
         output,
-        this.toString(),
+        outputString,
         function(/* err */) {
           callback();
         }.bind(this)
@@ -340,6 +343,25 @@ WebpackAssetsManifest.prototype.handleModuleAsset = function(module, hashedFile)
 };
 
 /**
+ * Handle chunk assets
+ *
+ * @param  {object} chunk
+ * @param  {string} hashedFile
+ */
+WebpackAssetsManifest.prototype.handleChunkAsset = function(chunk, hashedFile)
+{
+  var key = 'chuck' + chunk.id;
+
+  if ( this.isHMR( hashedFile ) ) {
+    return;
+  }
+
+  this.set(key, hashedFile);
+
+  this.emit('moduleAsset', this, key, hashedFile, module);
+};
+
+/**
  * Hook into the compilation object
  *
  * @param  {object} compilation - the Webpack compilation object
@@ -347,6 +369,8 @@ WebpackAssetsManifest.prototype.handleModuleAsset = function(module, hashedFile)
 WebpackAssetsManifest.prototype.handleCompilation = function(compilation)
 {
   compilation.plugin('module-asset', this.handleModuleAsset.bind(this));
+
+  compilation.plugin('chunk-asset', this.handleChunkAsset.bind(this));
 };
 
 /**
